@@ -37,6 +37,7 @@ contract FarmTreasuryV1 is ReentrancyGuard, FarmTokenV1 {
 	uint256 internal constant LOOP_LIMIT = 200;
 
 	address payable public governance;
+	address public governanceRewards;
 	address payable public farmBoss;
 
 	bool public paused = false;
@@ -72,12 +73,18 @@ contract FarmTreasuryV1 is ReentrancyGuard, FarmTokenV1 {
 
 	constructor(string memory _nameUnderlying, uint8 _decimalsUnderlying, address _underlying) public FarmTokenV1(_nameUnderlying, _decimalsUnderlying, _underlying) {
 		governance = msg.sender;
+		governanceRewards = msg.sender;
 		lastRebalanceUpTime = block.timestamp;
 	}
 
 	function setGovernance(address payable _new) external {
 		require(msg.sender == governance, "FARMTREASURYV1: !governance");
 		governance = _new;
+	}
+
+	function setGovernanceRewards(address _new) external {
+		require(msg.sender == governance, "FARMTREASURYV1: !governance");
+		governanceRewards = _new;
 	}
 
 	// the "farmBoss" is a trusted smart contract that functions kind of like an EOA.
@@ -389,14 +396,14 @@ contract FarmTreasuryV1 is ReentrancyGuard, FarmTokenV1 {
 		uint256 _sharesToTreasury = _sharesToMint.sub(_sharesToFarmer);
 
 		_mintShares(_farmerRewards, _sharesToFarmer);
-		_mintShares(governance, _sharesToTreasury);
+		_mintShares(governanceRewards, _sharesToTreasury);
 
 		uint256 _underlyingFarmer = getUnderlyingForShares(_sharesToFarmer);
 		uint256 _underlyingTreasury = getUnderlyingForShares(_sharesToTreasury);
 
 		// do two mint events, in underlying, not shares
 		emit Transfer(address(0), _farmerRewards, _underlyingFarmer);
-		emit Transfer(address(0), governance, _underlyingTreasury);
+		emit Transfer(address(0), governanceRewards, _underlyingTreasury);
 
 		return _underlyingFarmer.add(_underlyingTreasury);
 	}
@@ -427,14 +434,14 @@ contract FarmTreasuryV1 is ReentrancyGuard, FarmTokenV1 {
 		uint256 _sharesToTreasury = _sharesToMint.sub(_sharesToFarmer);
 
 		_mintShares(_farmerRewards, _sharesToFarmer);
-		_mintShares(governance, _sharesToTreasury);
+		_mintShares(governanceRewards, _sharesToTreasury);
 
 		uint256 _underlyingFarmer = getUnderlyingForShares(_sharesToFarmer);
 		uint256 _underlyingTreasury = getUnderlyingForShares(_sharesToTreasury);
 
 		// do two mint events, in underlying, not shares
 		emit Transfer(address(0), _farmerRewards, _underlyingFarmer);
-		emit Transfer(address(0), governance, _underlyingTreasury);
+		emit Transfer(address(0), governanceRewards, _underlyingTreasury);
 
 		return _underlyingFarmer.add(_underlyingTreasury);
 	}
