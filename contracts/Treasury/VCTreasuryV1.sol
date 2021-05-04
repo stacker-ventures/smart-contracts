@@ -14,6 +14,8 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import "./FarmTreasuryV1_ETH.sol";
+
 contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 	using SafeERC20 for IERC20;
 	using Address for address;
@@ -35,8 +37,7 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 	bool public killed;
 	address public constant BET_TOKEN = 0xfdd4E938Bb067280a52AC4e02AaF1502Cc882bA6;
 	address public constant STACK_TOKEN = 0x514910771AF9Ca656af840dff83E8264EcF986CA; // TODO: need to deploy this contract, incorrect address, this is LINK token
-	
-	address public BASE_TOKEN; // fund will be denominated in stackETH, to generate interest on funds that aren't actively invested
+	address payable public constant BASE_TOKEN = 0x70e51DFc7A9FC391995C2B2f027BC49D4fe01577; // fund will be denominated in stackETH, to generate interest on funds that aren't actively invested
 
 	// we have some looping in the contract. have a limit for loops so that they succeed.
 	// loops & especially unbounded loops are bad solidity design.
@@ -95,14 +96,13 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 	event DevestmentRevoked(uint256 sellId, uint256 time);
 	event DevestmentExecuted(uint256 sellId, address tokenSell, uint256 ethIn, uint256 amountOut, address taker, uint256 time);
 
-	constructor(address payable _governance, address _baseToken) public ERC20("Stacker.vc Fund001", "SVC001") {
+	constructor(address payable _governance) public ERC20("Stacker.vc VCFund1", "SVC001") {
 		deployer = msg.sender;
 		governance = _governance;
-		BASE_TOKEN = _baseToken;
 
 		currentState = FundStates.setup;
 		
-		_setupDecimals(18);
+		_setupDecimals(8);
 	}
 
 	// receive ETH, do nothing
@@ -166,18 +166,20 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 	}
 
 	// seed the fund with BASE_TOKEN and start it up. 1 year until fund is dissolved
-	function startFund() external {
+	function startFund() payable external {
 		require(currentState == FundStates.setup, "VCTREASURYV1: !FundStates.setup");
 		require(msg.sender == governance, "VCTREASURYV1: !governance");
 		require(totalSupply() > 0, "VCTREASURYV1: invalid setup"); // means fund tokens were not issued
+		require(msg.value > 0, "VCTREASURYV1: need value for init");
 
 		fundStartTime = block.timestamp;
 		fundCloseTime = block.timestamp.add(ONE_YEAR);
 
-		// fund must be sent BASE_TOKEN before calling this function
-		initETH = IERC20(BASE_TOKEN).balanceOf(address(this));
-		require(initETH > 0, "VCTREASURYV1: !initETH");
-		maxInvestment = initETH.mul(investmentCap).div(max);
+		// deposit ETH for stackETH, no referral needed
+		FarmTreasuryV1_ETH(BASE_TOKEN).depositETH{value: msg.value}(address(0));
+
+		uint256 _stackETH = IERC20(BASE_TOKEN).balanceOf(address(this));
+		maxInvestment = _stackETH.mul(investmentCap).div(max);
 
 		_changeFundState(FundStates.active); // set fund active!
 	}
@@ -202,7 +204,7 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 		currentBuyProposal = _buy;
 		nextBuyId = nextBuyId.add(1);
 		
-		InvestmentProposed(_buy.buyId, _tokenAccept, _amountInMin, _ethOut, _taker, _buy.maxTime);
+		emit InvestmentProposed(_buy.buyId, _tokenAccept, _amountInMin, _ethOut, _taker, _buy.maxTime);
 	}
 
 	// revoke an uncompleted investment offer
@@ -217,7 +219,7 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 		BuyProposal memory _reset;
 		currentBuyProposal = _reset;
 
-		InvestmentRevoked(_buy.buyId, block.timestamp);
+		emit InvestmentRevoked(_buy.buyId, block.timestamp);
 	}
 
 	// execute an investment offer by sending tokens to the contract, in exchange for ETH
@@ -242,9 +244,10 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 
 		boughtTokens[_buy.tokenAccept] = true;
 
-		InvestmentExecuted(_buy.buyId, _buy.tokenAccept, _amount, _buy.ethOut, msg.sender, block.timestamp);
+		emit InvestmentExecuted(_buy.buyId, _buy.tokenAccept, _amount, _buy.ethOut, msg.sender, block.timestamp);
 
-		IERC20(BASE_TOKEN).safeTransfer(msg.sender, _buy.ethOut);
+		FarmTreasuryV1_ETH(BASE_TOKEN).withdrawETH(_buy.ethOut);
+		msg.sender.transfer(_buy.ethOut);
 	}
 
 	// allow advisory multisig to propose a new sell. get ETH, give ERC20 prior investment
@@ -263,7 +266,7 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 
 		currentSellProposals[nextSellId] = _sell;
 		
-		DevestmentProposed(nextSellId, _tokenSell, _ethInMin, _amountOut, _taker, _sell.vetoTime, _sell.maxTime);
+		emit DevestmentProposed(nextSellId, _tokenSell, _ethInMin, _amountOut, _taker, _sell.vetoTime, _sell.maxTime);
 
 		nextSellId = nextSellId.add(1);
 	}
@@ -278,11 +281,11 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 		SellProposal memory _reset;
 		currentSellProposals[_sellId] = _reset;
 
-		DevestmentRevoked(_sellId, block.timestamp);
+		emit DevestmentRevoked(_sellId, block.timestamp);
 	}
 
 	// execute a divestment of funds
-	function devestExecute(uint256 _sellId, uint256 _ethIn) nonReentrant external {
+	function devestExecute(uint256 _sellId) nonReentrant external payable {
 		_checkCloseTime();
 		require(currentState == FundStates.active, "VCTREASURYV1: !FundStates.active");
 
@@ -291,24 +294,21 @@ contract VCTreasuryV1 is ERC20, ReentrancyGuard {
 		require(_sell.taker == msg.sender || _sell.taker == address(0), "VCTREASURYV1: !taker"); // if taker is set to 0x0, anyone can accept this devestment
 		require(block.timestamp > _sell.vetoTime, "VCTREASURYV1: time < vetoTime");
 		require(block.timestamp <= _sell.maxTime, "VCTREASURYV1: time > maxTime");
-		require(_ethIn >= _sell.ethInMin, "VCTREASURYV1: ethIn < ethInMin"); // initial sanity check
-
-		uint256 _before = IERC20(BASE_TOKEN).balanceOf(address(this));
-		IERC20(BASE_TOKEN).safeTransferFrom(msg.sender, address(this), _ethIn);
-		uint256 _after = IERC20(BASE_TOKEN).balanceOf(address(this));
-		uint256 _totalIn = _after.sub(_before);
-		require(_totalIn >= _sell.ethInMin, "VCTREASURYV1: totalIn < ethInMin"); // actually transfer funds and check amount
+		require(msg.value >= _sell.ethInMin, "VCTREASURYV1: ethIn < ethInMin"); // initial sanity check
 
 		SellProposal memory _reset;
 		currentSellProposals[_sellId] = _reset; // set devestment proposal to a blank proposal, re-entrancy guard
 
-		DevestmentExecuted(_sellId, _sell.tokenSell, _totalIn, _sell.amountOut, msg.sender, block.timestamp);
-		IERC20(_sell.tokenSell).safeTransfer(msg.sender, _sell.amountOut); // we already received _totalIn >= _sell.ethInMin, by above assertions
-
-		// if we completely sell out of an asset, mark this as not owned anymore
-		if (IERC20(_sell.tokenSell).balanceOf(address(this)) == 0){
+		// if we are selling all of an asset, then mark as not owned anymore
+		if (IERC20(_sell.tokenSell).balanceOf(address(this)).sub(_sell.amountOut) == 0){
 			boughtTokens[_sell.tokenSell] = false;
 		}
+
+		// invest the ETH into stackETH
+		FarmTreasuryV1_ETH(BASE_TOKEN).depositETH{value: msg.value}(address(0));
+
+		emit DevestmentExecuted(_sellId, _sell.tokenSell, msg.value, _sell.amountOut, msg.sender, block.timestamp);
+		IERC20(_sell.tokenSell).safeTransfer(msg.sender, _sell.amountOut); // we already received _totalIn >= _sell.ethInMin, by above assertions
 	}
 
 	// stake SVC001 tokens to the fund. this signals unhappyness with the fund management
