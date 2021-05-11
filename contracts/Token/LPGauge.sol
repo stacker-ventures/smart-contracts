@@ -2,7 +2,7 @@
 /*
 A simple gauge contract to measure the amount of tokens locked, and reward users in a different token.
 
-Using this for STACK/ETH Uni LP currently.
+Updated for MATIC Sushi LP Emission. Just overwrite constants for new distriution/chains.
 */
 
 pragma solidity ^0.6.11;
@@ -18,18 +18,17 @@ contract LPGauge is ReentrancyGuard {
 	using Address for address;
     using SafeMath for uint256;
 
-    address payable public governance = 0xB156d2D9CAdB12a252A9015078fc5cb7E92e656e; // STACK DAO Agent address
-    address public constant acceptToken = 0xd78E04a200048a438D9D03C9A3d7E5154dE643b1; // STACK/ETH Uniswap LP Token
+    address payable public governance = 0x0Bc3BD0FFcC8197FD0F43998307F09C02fd09f1c; // STACK DAO Agent address
+    address public constant acceptToken = 0x3685EAbC43d18ECF04b0F8ED75E4894b4DbB85B2; // STACK/USDC Sushiswap LP Token
 
-    // TODO: get STACK token address
-    address public constant STACK = 0xe0955F26515d22E347B17669993FCeFcc73c3a0a; // STACK DAO Token
+    address public constant STACK = 0xccBe9B810d6574701d324fD6DbE0A1b68f9d5bf7; // STACK DAO Token - Matic POS Version
 
-    uint256 public emissionRate = 25209289623226158; // 60k STACK / delta blocks
+    uint256 public emissionRate = 1446759259259259; // 60k STACK / delta blocks
 
     uint256 public deposited;
 
-    uint256 public constant startBlock = 11955015;
-    uint256 public endBlock = startBlock + 2380075;
+    uint256 public constant startBlock = 14609032;
+    uint256 public endBlock = startBlock + 3456000;
 
     // uint256 public constant startBlock = 11226037 + 100;
     // uint256 public endBlock = startBlock + 2425846;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /*
-* Basic ERC20 token, with minting access controlled by governance. Any account can be granted and removed as a "minter".
+* Basic ERC20 token, with minting access only allowed from governance. Set governance to 0x0 if minting function needs to be burnt.
 */
 
 pragma solidity ^0.6.11;
