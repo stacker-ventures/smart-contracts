@@ -29,13 +29,13 @@ contract GaugeD2_bonus is IERC20, ReentrancyGuard {
     address public constant STACK = 0xccBe9B810d6574701d324fD6DbE0A1b68f9d5bf7; // STACK DAO Token
     address public constant bonusToken = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270; // token distributed as a bonus (WMATIC)
 
-    uint256 public emissionRate = 100e18/100000; // TODO: final emission rate
-    uint256 public bonusRate = 111; // TODO: bonus rate
+    uint256 public emissionRate = 2893518518518518;
+    uint256 public bonusRate = 3621238425925925;
 
     uint256 public depositedShares;
 
-    uint256 public constant startBlock = 0; // TODO: start block
-    uint256 public endBlock = startBlock + 100000; // TODO: length of emission 
+    uint256 public constant startBlock = 14609032;
+    uint256 public endBlock = startBlock + 3456000;
 
     uint256 public lastBlock; // last block the distribution has ran
     uint256 public tokensAccrued; // tokens to distribute per weight scaled by 1e18
