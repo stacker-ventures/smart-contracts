@@ -177,16 +177,16 @@ contract GaugeD2_bonus is IERC20, ReentrancyGuard {
         IERC20(acceptToken).safeTransfer(msg.sender, _amount);
     }
 
-    function claimSTACK() nonReentrant external returns (uint256) {
+    function claimSTACK() nonReentrant external returns (uint256, uint256) {
         return _claimSTACK(msg.sender);
     }
 
-    function _claimSTACK(address _user) internal returns (uint256) {
+    function _claimSTACK(address _user) internal returns (uint256, uint256) {
         _kick();
 
         DepositState memory _state = shares[_user];
-        if (_state.tokensAccrued == tokensAccrued){ // user doesn't have any accrued tokens
-            return 0;
+        if (_state.tokensAccrued == tokensAccrued && _state.bonusAccrued == bonusAccrued){ // user doesn't have any accrued tokens
+            return (0, 0);
         }
         else {
             uint256 _tokensAccruedDiff = tokensAccrued.sub(_state.tokensAccrued);
@@ -213,7 +213,7 @@ contract GaugeD2_bonus is IERC20, ReentrancyGuard {
             emit STACKClaimed(_user, _tokensGive);
             emit BonusClaimed(_user, _bonusGive);
 
-            return _tokensGive;
+            return (_tokensGive, _bonusGive);
         }
     }
 
