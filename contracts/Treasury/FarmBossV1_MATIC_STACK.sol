@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./FarmBossV1_MATIC.sol";
 
-contract FarmBossV1_MATIC_USDC is FarmBossV1_MATIC {
+contract FarmBossV1_MATIC_STACK is FarmBossV1_MATIC {
 	using SafeERC20 for IERC20;
 	using SafeMath for uint256;
 	using Address for address;
